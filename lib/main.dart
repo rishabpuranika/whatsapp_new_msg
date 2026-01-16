@@ -21,7 +21,7 @@ class InstaNewMsgApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'InstaNewMsg',
+      title: 'WhatsAppNewMsg',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -260,7 +260,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         const SizedBox(height: 20),
         const Text(
-          'InstaNewMsg',
+          'WhatsAppNewMsg',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,

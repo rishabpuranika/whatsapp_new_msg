@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.instanewmsg" "\0"
-            VALUE "FileDescription", "insta_new_msg" "\0"
+            VALUE "CompanyName", "com.whatsappnewmsg" "\0"
+            VALUE "FileDescription", "WhatsAppNewMsg" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "insta_new_msg" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.instanewmsg. All rights reserved." "\0"
-            VALUE "OriginalFilename", "insta_new_msg.exe" "\0"
-            VALUE "ProductName", "insta_new_msg" "\0"
+            VALUE "InternalName", "whatsapp_new_msg" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.whatsappnewmsg. All rights reserved." "\0"
+            VALUE "OriginalFilename", "whatsapp_new_msg.exe" "\0"
+            VALUE "ProductName", "WhatsAppNewMsg" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
