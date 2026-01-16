@@ -40,6 +40,7 @@ dependencies:
   
   # Local storage for recent numbers
   shared_preferences: ^2.2.2
+  google_fonts: ^6.1.0
   msix: ^3.16.12
 
 dev_dependencies:

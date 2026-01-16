@@ -1,8 +1,10 @@
+import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,11 +27,14 @@ class InstaNewMsgApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF25D366),
           brightness: Brightness.dark,
         ),
-        fontFamily: 'Roboto',
+        textTheme: GoogleFonts.outfitTextTheme(
+          ThemeData.dark().textTheme,
+        ),
       ),
       home: const HomePage(),
     );
@@ -43,16 +48,17 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
-  final FocusNode _phoneFocusNode = FocusNode();
   
   String _selectedCountryCode = '91';
   List<String> _recentNumbers = [];
   bool _isLoading = false;
   
-  late AnimationController _animController;
+  // Animations
+  late AnimationController _bgAnimController;
+  late AnimationController _fadeAnimController;
   late Animation<double> _fadeAnim;
 
   // Country codes list
@@ -79,22 +85,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.initState();
     _loadRecentNumbers();
     
-    _animController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    // Background Animation
+    _bgAnimController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    // Fade In Animation
+    _fadeAnimController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    _fadeAnim = CurvedAnimation(
+      parent: _fadeAnimController,
+      curve: Curves.easeOutQuart,
     );
-    _animController.forward();
+    _fadeAnimController.forward();
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _messageController.dispose();
-    _phoneFocusNode.dispose();
-    _animController.dispose();
+    _bgAnimController.dispose();
+    _fadeAnimController.dispose();
     super.dispose();
   }
 
@@ -131,12 +145,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final phone = _phoneController.text.trim();
     
     if (phone.isEmpty) {
-      _showSnackBar('Please enter a phone number');
+      _showSnackBar('Please enter a phone number', isError: true);
       return;
     }
     
     if (phone.length < 5) {
-      _showSnackBar('Please enter a valid phone number');
+      _showSnackBar('Please enter a valid phone number', isError: true);
       return;
     }
 
@@ -157,17 +171,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        _showSnackBar('Could not open WhatsApp');
+        _showSnackBar('Could not open WhatsApp', isError: true);
       }
     } catch (e) {
-      _showSnackBar('Error: ${e.toString()}');
+      _showSnackBar('Error: ${e.toString()}', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   void _useRecentNumber(String fullNumber) {
-    // Find matching country code
     for (final country in _countryCodes) {
       if (fullNumber.startsWith(country['code']!)) {
         setState(() {
@@ -177,17 +190,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         return;
       }
     }
-    // Fallback
     _phoneController.text = fullNumber;
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: isError ? Colors.redAccent.withOpacity(0.8) : const Color(0xFF2D3748),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: const Color(0xFF2D3748),
+        elevation: 0,
+        margin: const EdgeInsets.all(20),
       ),
     );
   }
@@ -195,39 +212,141 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0A1628),
-              Color(0xFF1A2744),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnim,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 20),
-                  _buildHeader(),
-                  const SizedBox(height: 40),
-                  _buildCard(),
-                  if (_recentNumbers.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    _buildRecentSection(),
-                  ],
-                  const SizedBox(height: 24),
-                  _buildFooter(),
-                ],
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          _buildAnimatedBackground(),
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 40),
+                      _buildGlassCard(
+                        child: Column(
+                          children: [
+                            _buildPhoneInput(),
+                            const SizedBox(height: 20),
+                            _buildMessageInput(),
+                            const SizedBox(height: 24),
+                            _buildSendButton(),
+                          ],
+                        ),
+                      ),
+                      if (_recentNumbers.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _buildRecentSection(),
+                      ],
+                      const SizedBox(height: 30),
+                      Text(
+                        'Start a chat without saving the number',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnimatedBackground() {
+    return AnimatedBuilder(
+      animation: _bgAnimController,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF0F2027),
+                Color.lerp(const Color(0xFF203A43), const Color(0xFF2C5364), _bgAnimController.value)!,
+                const Color(0xFF2C5364),
+              ],
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -100,
+                right: -100,
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF25D366).withOpacity(0.15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF25D366).withOpacity(0.15),
+                        blurRadius: 100,
+                        spreadRadius: 20,
+                      )
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -50,
+                left: -50,
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blueAccent.withOpacity(0.1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blueAccent.withOpacity(0.1),
+                        blurRadius: 100,
+                        spreadRadius: 20,
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlassCard({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.1),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 20,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
+          child: child,
         ),
       ),
     );
@@ -237,240 +356,201 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return Column(
       children: [
         Container(
-          width: 80,
-          height: 80,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+            color: const Color(0xFF25D366).withOpacity(0.2),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF25D366).withOpacity(0.5),
+              width: 2,
             ),
-            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF25D366).withOpacity(0.3),
+                color: const Color(0xFF25D366).withOpacity(0.2),
                 blurRadius: 20,
-                offset: const Offset(0, 10),
+                spreadRadius: 5,
               ),
             ],
           ),
           child: const Icon(
-            Icons.chat_bubble_rounded,
+            Icons.chat_bubble_outline_rounded,
             color: Colors.white,
             size: 40,
           ),
         ),
-        const SizedBox(height: 20),
-        const Text(
-          'WhatsAppNewMsg',
-          style: TextStyle(
-            fontSize: 28,
+        const SizedBox(height: 16),
+        Text(
+          'Quick Message',
+          style: GoogleFonts.outfit(
+            fontSize: 32,
             fontWeight: FontWeight.bold,
             color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Send WhatsApp messages without saving contacts',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.white.withOpacity(0.7),
+            letterSpacing: 1.2,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2744).withOpacity(0.95),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.05),
+  Widget _buildPhoneInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'RECIPIENT\'S PHONE NUMBER',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withOpacity(0.6),
+            letterSpacing: 1,
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Phone Number Input
-          Text(
-            'Phone Number',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              // Country Code Dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              ),
+              child: Center(
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _selectedCountryCode,
-                    dropdownColor: const Color(0xFF2D3748),
-                    icon: Icon(
-                      Icons.arrow_drop_down,
-                      color: Colors.white.withOpacity(0.5),
-                    ),
+                    dropdownColor: const Color(0xFF1F2937),
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withOpacity(0.5)),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
                     items: _countryCodes.map((country) {
                       return DropdownMenuItem(
                         value: country['code'],
-                        child: Text(
-                          '${country['flag']} +${country['code']}',
-                          style: const TextStyle(color: Colors.white),
-                        ),
+                        child: Text('${country['flag']} +${country['code']}'),
                       );
                     }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedCountryCode = value!);
-                    },
+                    onChanged: (value) => setState(() => _selectedCountryCode = value!),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              // Phone Input
-              Expanded(
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
                 child: TextField(
                   controller: _phoneController,
-                  focusNode: _phoneFocusNode,
                   keyboardType: TextInputType.phone,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  style: const TextStyle(color: Colors.white, fontSize: 18, letterSpacing: 1),
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(
-                    hintText: 'Enter phone number',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF25D366),
-                        width: 2,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
+                    hintText: '000 000 0000',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.paste_rounded, color: Colors.white.withOpacity(0.5), size: 20),
+                      onPressed: () async {
+                        final data = await Clipboard.getData('text/plain');
+                        if (data?.text != null) {
+                          _phoneController.text = data!.text!.replaceAll(RegExp(r'[^0-9]'), '');
+                        }
+                      },
+                      tooltip: 'Paste',
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMessageInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'MESSAGE (OPTIONAL)',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withOpacity(0.6),
+            letterSpacing: 1,
           ),
-          const SizedBox(height: 20),
-          
-          // Message Input
-          Text(
-            'Message (Optional)',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.7),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: TextField(
+            controller: _messageController,
+            maxLines: 3,
+            minLines: 3,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: InputDecoration(
+              hintText: 'Type your hello...',
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(16),
+              suffixIcon: IconButton(
+                icon: Icon(Icons.clear_rounded, color: Colors.white.withOpacity(0.3), size: 20),
+                onPressed: () => _messageController.clear(),
+                tooltip: 'Clear',
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 150),
-            child: TextField(
-              controller: _messageController,
-              maxLines: null,
-              minLines: 3,
-              maxLength: 10000,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: 'Type your message here...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF25D366),
-                    width: 2,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSendButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _openWhatsApp,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF25D366),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: EdgeInsets.zero,
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Open in WhatsApp',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                ),
-                contentPadding: const EdgeInsets.all(16),
-                counterStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                  const SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded, size: 20, color: Colors.white.withOpacity(0.9)),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Send Button
-          SizedBox(
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _openWhatsApp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF25D366),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 8,
-                shadowColor: const Color(0xFF25D366).withOpacity(0.4),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.send_rounded, size: 22),
-                        SizedBox(width: 10),
-                        Text(
-                          'Open in WhatsApp',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildRecentSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2744).withOpacity(0.7),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
+    return _buildGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -478,70 +558,52 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Numbers',
+                'Recent',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Colors.white.withOpacity(0.7),
                 ),
               ),
-              TextButton(
-                onPressed: _clearRecentNumbers,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF25D366),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: const Text('Clear All'),
+              GestureDetector(
+                onTap: _clearRecentNumbers,
+                child: Icon(Icons.delete_outline_rounded, color: Colors.white.withOpacity(0.5), size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ...(_recentNumbers.map((number) => _buildRecentItem(number))),
+          const SizedBox(height: 16),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _recentNumbers.length,
+            separatorBuilder: (c, i) => Divider(color: Colors.white.withOpacity(0.1), height: 20),
+            itemBuilder: (context, index) {
+              final number = _recentNumbers[index];
+              return InkWell(
+                onTap: () => _useRecentNumber(number),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.history_rounded, color: Colors.white, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '+$number',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                    const Spacer(),
+                    Icon(Icons.north_west_rounded, color: Colors.white.withOpacity(0.3), size: 16),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRecentItem(String number) {
-    return InkWell(
-      onTap: () => _useRecentNumber(number),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Text(
-              '+$number',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: const Color(0xFF25D366).withOpacity(0.7),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFooter() {
-    return Text(
-      'Tap to open WhatsApp and start chatting instantly',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        fontSize: 12,
-        color: Colors.white.withOpacity(0.4),
       ),
     );
   }
