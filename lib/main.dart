@@ -388,29 +388,33 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ),
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _messageController,
-            maxLines: 3,
-            maxLength: 1000,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-            decoration: InputDecoration(
-              hintText: 'Type your message here...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.05),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFF25D366),
-                  width: 2,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 150),
+            child: TextField(
+              controller: _messageController,
+              maxLines: null,
+              minLines: 3,
+              maxLength: 10000,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              decoration: InputDecoration(
+                hintText: 'Type your message here...',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF25D366),
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.all(16),
+                counterStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
               ),
-              contentPadding: const EdgeInsets.all(16),
-              counterStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
             ),
           ),
           const SizedBox(height: 24),

@@ -40,6 +40,7 @@ dependencies:
   
   # Local storage for recent numbers
   shared_preferences: ^2.2.2
+  msix: ^3.16.12
 
 dev_dependencies:
   flutter_test:
@@ -93,3 +94,11 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+msix_config:
+  display_name: WhatsApp Quick Message
+  publisher_display_name: nullc
+  identity_name: com.nullc.whatsappquickmessage
+  msix_version: 1.0.0.0
+  output_name: WhatsAppQuickMessage
+  capabilities: internetClient
